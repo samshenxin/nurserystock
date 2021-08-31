@@ -28,18 +28,7 @@ public class ReplaceLabel
         this.repl_rl_qrcode = "zsf_replace_qrcode";
         this.repl_rl_rfid = "zsf_replace_qrcode";
         this.repl_remark = "zsf_remark";
-        this.repl_id = repl_id;
-        this.repl_billno = repl_billno;
-        this.repl_billstatus = repl_billstatus;
-        this.repl_creator = repl_creator;
-        this.repl_createtime = repl_createtime;
-        this.repl_name = repl_name;
-        this.repl_type = repl_type;
-        this.repl_qd_qrcode = repl_qd_qrcode;
-        this.repl_qd_rfid = repl_qd_rfid;
-        this.repl_rl_qrcode = repl_rl_qrcode;
-        this.repl_rl_rfid = repl_rl_rfid;
-        this.repl_remark = repl_remark;
+
     }
     
     public String getRepl_BILLNO() {

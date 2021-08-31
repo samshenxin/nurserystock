@@ -58,32 +58,6 @@ public class NurseryStock
         this.NURS_LABELSTATUS = "zsf_labelstatus";
         this.NURS_INSID = "zsf_insid";
         this.NURS_OUTSID = "zsf_outsid";
-        this.NURS_ID = id;
-        this.NURS_BILLNO = billno;
-        this.NURS_CREATOR = creator;
-        this.NURS_CREATETIME = createtime;
-        this.NURS_SITE = zsf_site;
-        this.NURS_NAME = zsf_name;
-        this.NURS_TYPE = zsf_type;
-        this.NURS_QRCODE = zsf_qrcode;
-        this.NURS_RFID = zsf_rfid;
-        this.NURS_QTY = zsf_qty;
-        this.NURS_DBH = zsf_dbh;
-        this.NURS_GROUND_DIAMETER = zsf_ground_diameter;
-        this.NURS_CORONAL_DIAMETER = zsf_coronal_diameter;
-        this.NURS_METER_DIAMETER = zsf_meter_diameter;
-        this.NURS_HEIGHT = zsf_height;
-        this.NURS_STORESTATUS = zsf_storestatus;
-        this.NURS_ESTIMATE_PRICE = zsf_estimate_price;
-        this.NURS_BUY_PRICE = zsf_buy_price;
-        this.NURS_SALE_PRICE = zsf_sale_price;
-        this.NURS_REMARK = zsf_remark;
-        this.NURS_PICTURE = zsf_picture;
-        this.NURS_CHECKEXPENSIVE = zsf_checkexpensive;
-        this.NURS_CHECKLABEL = zsf_checklabel;
-        this.NURS_LABELSTATUS = zsf_labelstatus;
-        this.NURS_INSID = zsf_insid;
-        this.NURS_OUTSID = zsf_outsid;
     }
     
     public String getNURS_ID() {

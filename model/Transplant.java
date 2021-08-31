@@ -28,18 +28,6 @@ public class Transplant
         this.tran_rfid = "zsf_rfid";
         this.tran_bf_gps = "zsf_before_gps";
         this.tran_af_gps = "zsf_after_gps";
-        this.tran_id = tran_id;
-        this.tran_billno = tran_billno;
-        this.tran_billstatus = tran_billstatus;
-        this.tran_creator = tran_creator;
-        this.tran_createtime = tran_createtime;
-        this.tran_site = tran_site;
-        this.tran_name = tran_name;
-        this.tran_type = tran_type;
-        this.tran_qrcode = tran_qrcode;
-        this.tran_rfid = tran_rfid;
-        this.tran_bf_gps = tran_bf_gps;
-        this.tran_af_gps = tran_af_gps;
     }
     
     public String getTran_id() {
