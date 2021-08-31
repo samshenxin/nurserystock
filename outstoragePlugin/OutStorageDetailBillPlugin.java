@@ -1,253 +1,201 @@
 package jdy.zsf.nurserystock.outstoragePlugin;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.EventObject;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
-
-import json.JSONObject;
-import kd.bos.algo.DataSet;
-import kd.bos.algo.Row;
-import kd.bos.algo.RowMeta;
-import kd.bos.cache.CacheFactory;
-import kd.bos.cache.DistributeSessionlessCache;
-import kd.bos.dataentity.entity.DynamicObject;
-import kd.bos.dataentity.utils.StringUtils;
-import kd.bos.db.DB;
-import kd.bos.db.DBRoute;
-import kd.bos.entity.datamodel.events.PropertyChangedArgs;
-import kd.bos.entity.operate.result.OperationResult;
-import kd.bos.form.FieldTip;
-import kd.bos.form.control.Toolbar;
-import kd.bos.form.control.events.ItemClickEvent;
-import kd.bos.form.events.BeforeDoOperationEventArgs;
-import kd.bos.form.plugin.AbstractFormPlugin;
-import kd.bos.logging.Log;
-import kd.bos.logging.LogFactory;
-import jdy.zsf.nurserystock.instoragePlugin.InStorageBillPlugin;
-import jdy.zsf.nurserystock.serviceHelper.ABillServiceHelper;
-import kd.bos.orm.query.QFilter;
-import kd.bos.servicehelper.BusinessDataServiceHelper;
+import kd.bos.form.plugin.*;
+import kd.bos.cache.*;
+import kd.bos.form.control.*;
+import kd.bos.form.events.*;
+import kd.bos.form.control.events.*;
+import kd.bos.dataentity.utils.*;
+import java.math.*;
+import kd.bos.dataentity.entity.*;
+import json.*;
+import kd.bos.db.*;
+import kd.bos.servicehelper.coderule.*;
 import kd.bos.servicehelper.coderule.CodeRuleServiceHelper;
-import kd.bos.servicehelper.operation.SaveServiceHelper;
+import kd.bos.algo.*;
+import kd.bos.servicehelper.operation.*;
+import kd.bos.entity.datamodel.events.*;
+import kd.bos.orm.query.*;
+import kd.bos.servicehelper.*;
+import kd.bos.form.*;
+import java.util.*;
+import java.util.List;
+import kd.bos.logging.*;
 
-/**
- * 出库订单明细单据插件
- * 
- * @author Administrator
- *
- */
-public class OutStorageDetailBillPlugin extends AbstractFormPlugin {
-	private static final Log logger = LogFactory.getLog(InStorageBillPlugin.class);
-	DistributeSessionlessCache cache = CacheFactory.getCommonCacheFactory()
-			.getDistributeSessionlessCache("customRegion");
-
-	final String site = cache.get("site");
-	final String qty = cache.get("qty") != null ? cache.get("qty") : "";
-	final String outsid = cache.get("outsid");
-
-	final String formId = "zsf_outstorageorderdetail";
-
-	public void registerListener(final EventObject e) {
-		super.registerListener(e);
-		Toolbar toolBar = (Toolbar) getView().getControl("tbmain");
-		toolBar.addItemClickListener(this);
-		this.addClickListeners("bar_save");
-	}
-
-	@Override
-	public void beforeDoOperation(BeforeDoOperationEventArgs args) {
-		super.beforeDoOperation(args);
-
-	}
-
-	public void itemClick(ItemClickEvent evt) {
-		String keyname = evt.getItemKey();
-		if (StringUtils.equalsIgnoreCase(keyname, "bar_save")) {
-			// 获取编码规则单据编号zsf_checkbox
-			DynamicObject dataInfo = this.getModel().getDataEntity();
-			BigDecimal qtyOb = (BigDecimal) dataInfo.get("zsf_qty");
-			boolean checkBox = (boolean) dataInfo.get("zsf_checkbox");
-			DynamicObject nameOb = (DynamicObject) dataInfo.get("zsf_name");
-			double realQty = qtyOb.doubleValue();
-			String name = nameOb != null ? nameOb.get("id").toString() : "";
-
-			int qty = (int) Math.floor(realQty);
-
-			// 先查询库存数量
-
-			String algoKey = getClass().getName() + ".query_resume";
-			String sql = "select d.fid,d.fk_zsf_name,d.fk_zsf_type,d.fk_zsf_qrcode,d.fk_zsf_rfid,d.fk_zsf_qty,d.fk_zsf_sale_price from tk_zsf_instorage i left join tk_zsf_instorage_detail d "
-					+ "on i.fid = d.fk_zsf_insid "
-					+ "where i.fk_zsf_site =?  and d.fk_zsf_name =? and d.fk_zsf_store_status='0'";
-			Object[] params = { site, name };
-			List<JSONObject> list = new ArrayList<JSONObject>();
-			try (DataSet ds = DB.queryDataSet(algoKey, DBRoute.of("fa"), sql, params)) {
-				RowMeta md = ds.getRowMeta();
-				int columnCount = md.getFieldCount();
-				while (ds.hasNext()) {
-					Row row = ds.next();
-					Map<String, Object> rowData = new HashMap<String, Object>();
-					for (int k = 0; k < columnCount; k++) {
-						rowData.put(md.getField(k).toString(), row.get(k));
-					}
-					JSONObject json = new JSONObject(rowData);
-					list.add(json);
-				}
-			}
-
-			// 批量录入
-			if (qty != 0 && checkBox) {
-				// 获取编码规则批次编码号,注意：会消耗编码流水号
-				String[] numbers = CodeRuleServiceHelper.getBatchNumber(this.getView().getEntityId().toString(),
-						dataInfo, null, qty);
-
-				for (int i = 0; i < qty; i++) {
-
-					if (list.size() > 0) {
-						Object[] objResult = null;
-						if (i > 0) {
-							DynamicObject dynobj = BusinessDataServiceHelper.newDynamicObject(formId);
-							// dynobj.set("billno", numbers[i]);
-							dynobj.set("zsf_name", list.get(i).get("fk_zsf_name"));
-							dynobj.set("zsf_type", list.get(i).get("fk_zsf_type"));
-							dynobj.set("zsf_ground_diameter", dataInfo.get("zsf_ground_diameter"));
-							dynobj.set("zsf_dbh", dataInfo.get("zsf_dbh"));
-							dynobj.set("zsf_coronal_diameter", dataInfo.get("zsf_coronal_diameter"));
-							dynobj.set("zsf_meter_diameter", dataInfo.get("zsf_meter_diameter"));
-							dynobj.set("zsf_height", dataInfo.get("zsf_height"));
-							dynobj.set("zsf_storestatus", dataInfo.get("zsf_storestatus"));
-							dynobj.set("zsf_remark", dataInfo.get("zsf_remark"));
-							dynobj.set("createtime", dataInfo.get("createtime"));
-							dynobj.set("billstatus", dataInfo.get("billstatus"));
-							dynobj.set("creator", dataInfo.get("creator"));
-							dynobj.set("modifier", dataInfo.get("modifier"));
-							dynobj.set("modifytime", dataInfo.get("modifytime"));
-							dynobj.set("zsf_outsid", dataInfo.get("zsf_outsid"));
-							dynobj.set("number", numbers[i]);
-
-							dynobj.set("zsf_sale_price", dataInfo.get("zsf_sale_price"));
-							dynobj.set("zsf_buy_price", dataInfo.get("zsf_buy_price"));
-							dynobj.set("zsf_estimate_price", dataInfo.get("zsf_estimate_price"));
-							dynobj.set("zsf_qrcode", list.get(i).get("fk_zsf_qrcode"));
-							dynobj.set("zsf_rfid", list.get(i).get("fk_zsf_rfid"));
-							dynobj.set("zsf_qty", 1);
-							objResult = SaveServiceHelper.save(new DynamicObject[] { dynobj });
-
-						} else {
-							dataInfo.set("zsf_qrcode", list.get(i).get("fk_zsf_qrcode"));
-							dataInfo.set("zsf_rfid", list.get(i).get("fk_zsf_rfid"));
-							dataInfo.set("zsf_qty", 1);
-							objResult = SaveServiceHelper.save(new DynamicObject[] { dataInfo });
-
-						}
-
-						logger.info("出库明细批量保存：" + objResult);
-						// 更新入库明细对应id数据的库存状态为出库
-						if (objResult.length > 0) {
-							Object[] param = { list.get(i).get("fid") };
-							String updateSql = "update tk_zsf_instorage_detail set fk_zsf_store_status = '1' where fid =? ";
-							boolean updateFlag = DB.execute(DBRoute.basedata, updateSql, param);
-							logger.info("出库保存成功并更新入库库存状态：" + updateFlag);
-						} else {
-							// 指定回收的编号
-							CodeRuleServiceHelper.autoRecycleNumber(formId);
-							boolean recycleNum = CodeRuleServiceHelper.recycleNumber(formId, dataInfo, null,
-									numbers[i]);
-							logger.info("保存失败回收编码：" + recycleNum);
-						}
-
-					} else {
-						// 指定回收的编号
-						CodeRuleServiceHelper.autoRecycleNumber(formId);
-						boolean recycleNum = CodeRuleServiceHelper.recycleNumber(formId, dataInfo, null, numbers[i]);
-						logger.info("保存失败回收编码：" + recycleNum);
-						this.getView().showTipNotification("库存数量不足");
-						break;
-					}
-				}
-			} else {
-				OperationResult operationResult = ABillServiceHelper.saveOperate(this.getView());
-				logger.info("出库明细保存：" + operationResult.getMessage());
-				if (!operationResult.isSuccess()) {
-					// 指定回收的编号
-					CodeRuleServiceHelper.autoRecycleNumber(formId);
-					boolean recycleNum = CodeRuleServiceHelper.recycleNumber(formId, dataInfo, null, dataInfo.getString("billno"));
-					logger.info("保存失败回收编码：" + recycleNum);
-				}
-			}
-		}
-	}
-
-	@Override
-	public void afterCreateNewData(EventObject e) {
-		// 从缓存中获取入库id
-		if (outsid != null) {
-			// 设置入库明细单编码
-			this.getModel().setValue("zsf_outsid", outsid);
-		}
-
-	}
-
-	@Override
-	public void propertyChanged(PropertyChangedArgs e) {
-		String propName = e.getProperty().getName();
-		// 获取品名中的缩略图并显示
-		if (propName.equals("zsf_name")) {
-			DynamicObject pictureOb = (DynamicObject) this.getModel().getValue("zsf_name");
-			Long id = (Long) pictureOb.get("id");
-			QFilter[] filters = { ((id != null) ? new QFilter("id", "=", id) : null) };
-			Map<Object, DynamicObject> map = BusinessDataServiceHelper.loadFromCache("zsf_nurseryname",
-					"id,name,number,zsf_picture,zsf_nurserytype", filters);
-			String picture = null;
-			DynamicObject zsf_nurserytype = null;
-			for (Iterator<java.util.Map.Entry<Object, DynamicObject>> ite = map.entrySet().iterator(); ite.hasNext();) {
-				@SuppressWarnings("rawtypes")
-				Map.Entry entry = (java.util.Map.Entry) ite.next();
-				DynamicObject object = (DynamicObject) entry.getValue(); // 拿到表单对象
-				picture = (String) object.getString("zsf_picture");
-				zsf_nurserytype =  object.getDynamicObject("zsf_nurserytype");
-			}
-			this.getModel().setValue("zsf_picture", picture);
-			this.getModel().setValue("zsf_type", zsf_nurserytype);
-		}
-		if (propName.equals("zsf_qty")) {
-			// 校验剩余可出库数量
-			DynamicObject nameOb = (DynamicObject) this.getModel().getValue("zsf_name");
-			String name = nameOb != null ? nameOb.get("id").toString() : "";
-
-			int columnCount = 0;
-			String algoKey = getClass().getName() + ".query_resume";
-			String sql = "select d.fid from tk_zsf_instorage i left join tk_zsf_instorage_detail d "
-					+ "on i.fid = d.fk_zsf_insid "
-					+ "where i.fk_zsf_site =?  and d.fk_zsf_name =? and d.fk_zsf_store_status='0'";
-			Object[] params = { site, name };
-			try (DataSet ds = DB.queryDataSet(algoKey, DBRoute.of("fa"), sql, params)) {
-				while (ds.hasNext()) {
-					Row row = ds.next();
-					if(row.getInteger(0)!= null) {
-						columnCount = row.getInteger(0);
-					}	
-				}
-			}
-
-			BigDecimal qtyOb = (BigDecimal) this.getModel().getValue("zsf_qty");
-			double realQty = qtyOb.doubleValue();
-			FieldTip qtyFieldTip = new FieldTip(FieldTip.FieldTipsLevel.Info, FieldTip.FieldTipsTypes.others, "zsf_qty",
-					"数量不能大于库存数量" + columnCount);
-			if (realQty > columnCount) {
-				this.getView().showFieldTip(qtyFieldTip);
-			} else {
-				qtyFieldTip.setSuccess(true);
-				this.getView().showFieldTip(qtyFieldTip);
-			}
-
-		}
-
-	}
-
+public class OutStorageDetailBillPlugin extends AbstractFormPlugin
+{
+    private static final Log logger;
+    DistributeSessionlessCache cache;
+    final String site;
+    final String qty;
+    final String outsid;
+    final String formId = "zsf_outstorageorderdetail";
+    
+    public OutStorageDetailBillPlugin() {
+        this.cache = CacheFactory.getCommonCacheFactory().getDistributeSessionlessCache("customRegion");
+        this.site = (String)this.cache.get("site");
+        this.qty = (String)((this.cache.get("qty") != null) ? this.cache.get("qty") : "");
+        this.outsid = (String)this.cache.get("outsid");
+    }
+    
+    public void registerListener(final EventObject e) {
+        super.registerListener(e);
+        final Toolbar toolBar = (Toolbar)this.getView().getControl("tbmain");
+        toolBar.addItemClickListener((ItemClickListener)this);
+        this.addClickListeners(new String[] { "bar_save" });
+    }
+    
+    public void beforeDoOperation(final BeforeDoOperationEventArgs args) {
+        super.beforeDoOperation(args);
+    }
+    
+    public void itemClick(final ItemClickEvent evt) {
+        final String keyname = evt.getItemKey();
+        if (StringUtils.equalsIgnoreCase((CharSequence)keyname, (CharSequence)"bar_save")) {
+            final DynamicObject dataInfo = this.getModel().getDataEntity();
+            final BigDecimal qtyOb = (BigDecimal)dataInfo.get("zsf_qty");
+            final boolean checkBox = (boolean)dataInfo.get("zsf_checkbox");
+            final DynamicObject nameOb = (DynamicObject)dataInfo.get("zsf_name");
+            final double realQty = qtyOb.doubleValue();
+            final String name = (nameOb != null) ? nameOb.get("id").toString() : "";
+            final int qty = (int)Math.floor(realQty);
+            final String algoKey = this.getClass().getName() + ".query_resume";
+            final String sql = "select fid,fbillno,fk_zsf_name,fk_zsf_type,fk_zsf_qrcode,fk_zsf_rfid,fk_zsf_qty,fk_zsf_sale_price from  tk_zsf_instorage_detail  where fk_zsf_site =" + this.site + "  and fk_zsf_name =" + name + " and fk_zsf_store_status='0'";
+            final List<JSONObject> list = new ArrayList<JSONObject>();
+            try (final DataSet ds = DB.queryDataSet(algoKey, DBRoute.of("fa"), sql, (Object[])null)) {
+                final RowMeta md = ds.getRowMeta();
+                final int columnCount = md.getFieldCount();
+                while (ds.hasNext()) {
+                    final Row row = ds.next();
+                    final Map<String, Object> rowData = new HashMap<String, Object>();
+                    for (int k = 0; k < columnCount; ++k) {
+                        rowData.put(md.getField(k).toString(), row.get(k));
+                    }
+                    final JSONObject json = new JSONObject((Map)rowData);
+                    list.add(json);
+                }
+            }
+            final Object[] objResult = null;
+            if (qty != 0 && checkBox) {
+                final String[] numbers = CodeRuleServiceHelper.getBatchNumber(this.getView().getEntityId().toString(), dataInfo, (String)null, qty);
+                for (int i = 0; i < qty; ++i) {
+                    if (list.size() <= 0) {
+                        final boolean recycleNum = CodeRuleServiceHelper.recycleNumber("zsf_outstorageorderdetail", dataInfo, (String)null, numbers[i]);
+                        OutStorageDetailBillPlugin.logger.info("\u4fdd\u5b58\u5931\u8d25\u56de\u6536\u7f16\u7801\uff1a" + recycleNum);
+                        this.getView().showTipNotification("\u5e93\u5b58\u6570\u91cf\u4e0d\u8db3");
+                        break;
+                    }
+                    this.saveData(list.get(i), dataInfo, i, numbers);
+                }
+            }
+            else if (list.size() > 0) {
+                this.saveData(list.get(0), dataInfo, 0, null);
+            }
+            else {
+                final boolean recycleNum2 = CodeRuleServiceHelper.recycleNumber("zsf_outstorageorderdetail", dataInfo, (String)null, dataInfo.getString("billno"));
+                OutStorageDetailBillPlugin.logger.info("\u4fdd\u5b58\u5931\u8d25\u56de\u6536\u7f16\u7801\uff1a" + recycleNum2);
+                this.getView().showTipNotification("\u5e93\u5b58\u6570\u91cf\u4e0d\u8db3");
+            }
+        }
+    }
+    
+    public void saveData(final JSONObject josn, final DynamicObject dataInfo, final int i, final String[] numbers) {
+        Object[] objResult = null;
+        dataInfo.set("zsf_qrcode", josn.get((Object)"fk_zsf_qrcode"));
+        dataInfo.set("zsf_rfid", josn.get((Object)"fk_zsf_rfid"));
+        dataInfo.set("zsf_qty", (Object)1);
+        dataInfo.set("zsf_insid", josn.get((Object)"fbillno"));
+        dataInfo.set("zsf_name", josn.get((Object)"fk_zsf_name"));
+        dataInfo.set("zsf_type", josn.get((Object)"fk_zsf_type"));
+        dataInfo.set("zsf_ground_diameter", josn.get((Object)"zsf_ground_diameter"));
+        dataInfo.set("zsf_dbh", josn.get((Object)"zsf_dbh"));
+        dataInfo.set("zsf_coronal_diameter", josn.get((Object)"zsf_coronal_diameter"));
+        dataInfo.set("zsf_meter_diameter", josn.get((Object)"zsf_meter_diameter"));
+        dataInfo.set("zsf_height", josn.get((Object)"zsf_height"));
+        dataInfo.set("zsf_storestatus", josn.get((Object)"zsf_storestatus"));
+        dataInfo.set("zsf_remark", josn.get((Object)"zsf_remark"));
+        dataInfo.set("createtime", josn.get((Object)"createtime"));
+        dataInfo.set("billstatus", josn.get((Object)"billstatus"));
+        dataInfo.set("creator", josn.get((Object)"creator"));
+        dataInfo.set("modifier", josn.get((Object)"modifier"));
+        dataInfo.set("modifytime", josn.get((Object)"modifytime"));
+        dataInfo.set("zsf_outsid", josn.get((Object)"zsf_outsid"));
+        if (i > 0) {
+            dataInfo.set("billno", (Object)numbers[i]);
+        }
+        dataInfo.set("zsf_picture", josn.get((Object)"zsf_picture"));
+        dataInfo.set("zsf_sale_price", josn.get((Object)"zsf_sale_price"));
+        dataInfo.set("zsf_buy_price", josn.get((Object)"zsf_buy_price"));
+        dataInfo.set("zsf_estimate_price", josn.get((Object)"zsf_estimate_price"));
+        objResult = SaveServiceHelper.save(new DynamicObject[] { dataInfo });
+        OutStorageDetailBillPlugin.logger.info("\u51fa\u5e93\u660e\u7ec6\u4fdd\u5b58\uff1a" + objResult);
+        if (objResult.length > 0) {
+            final Object[] param = { josn.get((Object)"fbillno") };
+            final String updateSql = "update tk_zsf_instorage_detail set fk_zsf_store_status = '1' where fbillno =? ";
+            final boolean updateFlag = DB.execute(DBRoute.basedata, updateSql, param);
+            OutStorageDetailBillPlugin.logger.info("\u51fa\u5e93\u4fdd\u5b58\u6210\u529f\u5e76\u66f4\u65b0\u5165\u5e93\u5e93\u5b58\u72b6\u6001\uff1a" + updateFlag);
+        }
+        else {
+            final boolean recycleNum = CodeRuleServiceHelper.recycleNumber("zsf_outstorageorderdetail", dataInfo, (String)null, dataInfo.getString("billno"));
+            OutStorageDetailBillPlugin.logger.info("\u4fdd\u5b58\u5931\u8d25\u56de\u6536\u7f16\u7801\uff1a" + recycleNum);
+        }
+    }
+    
+    public void afterCreateNewData(final EventObject e) {
+        if (this.outsid != null) {
+            this.getModel().setValue("zsf_outsid", (Object)this.outsid);
+        }
+    }
+    
+    public void propertyChanged(final PropertyChangedArgs e) {
+        final String propName = e.getProperty().getName();
+        if (propName.equals("zsf_name")) {
+            final DynamicObject pictureOb = (DynamicObject)this.getModel().getValue("zsf_name");
+            final Long id = (Long)pictureOb.get("id");
+            final QFilter[] filters = { (id != null) ? new QFilter("id", "=", (Object)id) : null };
+            final Map<Object, DynamicObject> map = (Map<Object, DynamicObject>)BusinessDataServiceHelper.loadFromCache("zsf_nurseryname", "id,name,billno,zsf_picture,zsf_nurserytype", filters);
+            String picture = null;
+            DynamicObject typeObj = null;
+            for (final Map.Entry entry : map.entrySet()) {
+                final DynamicObject object = (DynamicObject) entry.getValue();
+                picture = object.getString("zsf_picture");
+                typeObj = object.getDynamicObject("zsf_nurserytype");
+            }
+            this.getModel().setValue("zsf_picture", (Object)picture);
+            this.getModel().setValue("zsf_type", (Object)typeObj);
+            final String obj = typeObj.getString("name");
+            if ("\u704c\u6728".equals(obj)) {
+                this.getModel().setValue("zsf_checkbox", (Object)false);
+            }
+        }
+        if (propName.equals("zsf_qty")) {
+            final DynamicObject nameOb = (DynamicObject)this.getModel().getValue("zsf_name");
+            final String name = (nameOb != null) ? nameOb.get("id").toString() : "";
+            int columnCount = 0;
+            final String algoKey = this.getClass().getName() + ".query_resume";
+            final String sql = "select sum(fk_zsf_qty) as qty from tk_zsf_instorage_detail where fk_zsf_site =" + this.site + "  and fk_zsf_name =" + name + " and fk_zsf_store_status='0'";
+            try (final DataSet ds = DB.queryDataSet(algoKey, DBRoute.of("fa"), sql, (Object[])null)) {
+                while (ds.hasNext()) {
+                    final Row row = ds.next();
+                    if (row.getInteger(0) != null) {
+                        columnCount = row.getInteger("qty");
+                    }
+                }
+            }
+            final BigDecimal qtyOb = (BigDecimal)this.getModel().getValue("zsf_qty");
+            final double realQty = qtyOb.doubleValue();
+            final FieldTip qtyFieldTip = new FieldTip(FieldTip.FieldTipsLevel.Info, FieldTip.FieldTipsTypes.others, "zsf_qty", "\u4e0d\u80fd\u5927\u4e8e\u5e93\u5b58\u6570\u91cf" + columnCount);
+            if (realQty > columnCount) {
+                this.getView().showFieldTip(qtyFieldTip);
+            }
+            else {
+                qtyFieldTip.setSuccess(true);
+                this.getView().showFieldTip(qtyFieldTip);
+            }
+        }
+    }
+    
+    static {
+        logger = LogFactory.getLog((Class)OutStorageDetailBillPlugin.class);
+    }
 }

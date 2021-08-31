@@ -1,93 +1,72 @@
 package jdy.zsf.nurserystock.outstoragePlugin;
 
-import java.math.BigDecimal;
-import java.util.EventObject;
+import kd.bos.form.plugin.*;
+import java.util.*;
+import kd.bos.servicehelper.coderule.*;
+import kd.bos.dataentity.entity.*;
+import kd.bos.entity.datamodel.events.*;
+import kd.bos.db.*;
+import java.math.*;
+import kd.bos.form.*;
+import kd.bos.algo.*;
+import kd.bos.logging.*;
 
-import kd.bos.algo.DataSet;
-import kd.bos.algo.Row;
-import kd.bos.algo.RowMeta;
-import kd.bos.dataentity.entity.DynamicObject;
-import kd.bos.db.DB;
-import kd.bos.db.DBRoute;
-import kd.bos.entity.datamodel.events.PropertyChangedArgs;
-import kd.bos.form.FieldTip;
-import kd.bos.form.plugin.AbstractFormPlugin;
-import kd.bos.logging.Log;
-import kd.bos.logging.LogFactory;
-import kd.bos.servicehelper.coderule.CodeRuleServiceHelper;
-/**
- * 出库单据插件
- * @author Administrator
- *
- */
-public class OutStorageBillPlugin extends AbstractFormPlugin {
-	private static final Log logger = LogFactory.getLog(OutStorageBillPlugin.class);
-	
-	@Override
-    public void afterCreateNewData(EventObject e) {
-	   //获取编码规则单据编号
-		DynamicObject dataInfo = this.getModel().getDataEntity();
-		// 获取编码规则编码
-		String number = CodeRuleServiceHelper.getNumber(this.getView().getEntityId().toString(), dataInfo, null);
-		String ordername = getOrdername(number);
-		
-	   //设置单据编码
-	    this.getModel().setValue("zsf_ordername",ordername);
-	}
-	
-	/**
-	 * 获取当前单据编号的日期+流水号后缀作为订单名称
-	 * @param billno
-	 * @return
-	 */
-	public String getOrdername(String billno) {
-		int last = billno.lastIndexOf("-");
-		billno = billno.substring(last+1);
-		String date = billno.substring(0,8);
-		String number = billno.substring(8,billno.length());
-		Integer num = Integer.valueOf(number)+1;
-		//流水号补零
-		int length = billno.length()-8-(String.valueOf(num).length());
-		String ordername = "";
-		for(int i=0; i<length; i++) {
-			ordername += "0"; 
-		}
-		logger.info("出库单编号："+date+ordername+num);
-		return date+ordername+num;
-	}
-	
-	@Override
-	public void propertyChanged(PropertyChangedArgs e) {
-		String propName = e.getProperty().getName();
-		if (propName.equals("zsf_qty")) {
-			//校验剩余可出库数量 
-			DynamicObject siteOb = (DynamicObject) this.getModel().getValue("zsf_site");
-			String site = siteOb != null ? siteOb.get("id").toString() : "";
-
-			int columnCount = 0;
-			String algoKey = getClass().getName() + ".query_resume";
-			String sql = "select d.fid from tk_zsf_instorage i left join tk_zsf_instorage_detail d "
-					+ "on i.fid = d.fk_zsf_insid "
-					+ "where i.fk_zsf_site =?  and d.fk_zsf_store_status='0'";
-			Object[] params = { site};
-			try (DataSet ds = DB.queryDataSet(algoKey, DBRoute.of("fa"), sql, params)) {
-				RowMeta md = ds.getRowMeta();
-				while (ds.hasNext()) {
-					Row row = ds.next();
-					columnCount++;
-				}
-			}
-			
-			BigDecimal qtyOb = (BigDecimal) this.getModel().getValue("zsf_qty");
-			double realQty = qtyOb.doubleValue();
-			if (realQty > columnCount) {
-				FieldTip qtyFieldTip = new FieldTip(FieldTip.FieldTipsLevel.Info, FieldTip.FieldTipsTypes.others,
-						"zsf_qty", "数量不能大于库存数量"+columnCount);
-				this.getView().showFieldTip(qtyFieldTip);
-			} else {
-			}
-
-		}
-	}
-
+public class OutStorageBillPlugin extends AbstractFormPlugin
+{
+    private static final Log logger;
+    
+    public void afterCreateNewData(final EventObject e) {
+        final DynamicObject dataInfo = this.getModel().getDataEntity();
+        final String number = CodeRuleServiceHelper.getNumber(this.getView().getEntityId().toString(), dataInfo, (String)null);
+        final String ordername = this.getOrdername(number);
+        this.getModel().setValue("zsf_ordername", (Object)ordername);
+    }
+    
+    public String getOrdername(String billno) {
+        final int last = billno.lastIndexOf("-");
+        billno = billno.substring(last + 1);
+        final String date = billno.substring(0, 8);
+        final String number = billno.substring(8, billno.length());
+        final Integer num = Integer.valueOf(number) + 1;
+        final int length = billno.length() - 8 - String.valueOf(num).length();
+        String ordername = "";
+        for (int i = 0; i < length; ++i) {
+            ordername += "0";
+        }
+        OutStorageBillPlugin.logger.info("\u51fa\u5e93\u5355\u7f16\u53f7\uff1a" + date + ordername + num);
+        return date + ordername + num;
+    }
+    
+    public void propertyChanged(final PropertyChangedArgs e) {
+        final String propName = e.getProperty().getName();
+        if (propName.equals("zsf_qty")) {
+            final DynamicObject siteOb = (DynamicObject)this.getModel().getValue("zsf_site");
+            final String site = (siteOb != null) ? siteOb.get("id").toString() : "";
+            int columnCount = 0;
+            final String algoKey = this.getClass().getName() + ".query_resume";
+            final String sql = "select sum(fk_zsf_qty) as qty from tk_zsf_instorage_detail where fk_zsf_site =" + site + "  and fk_zsf_store_status='0'";
+            try (final DataSet ds = DB.queryDataSet(algoKey, DBRoute.of("fa"), sql, (Object[])null)) {
+                while (ds.hasNext()) {
+                    final Row row = ds.next();
+                    if (row.getInteger(0) != null) {
+                        columnCount = row.getInteger("qty");
+                    }
+                }
+            }
+            final BigDecimal qtyOb = (BigDecimal)this.getModel().getValue("zsf_qty");
+            final double realQty = qtyOb.doubleValue();
+            final FieldTip qtyFieldTip = new FieldTip(FieldTip.FieldTipsLevel.Info, FieldTip.FieldTipsTypes.others, "zsf_qty", "\u4e0d\u80fd\u5927\u4e8e\u5e93\u5b58\u6570\u91cf" + columnCount);
+            if (realQty > columnCount) {
+                this.getView().showFieldTip(qtyFieldTip);
+            }
+            else {
+                qtyFieldTip.setSuccess(true);
+                this.getView().showFieldTip(qtyFieldTip);
+            }
+        }
+    }
+    
+    static {
+        logger = LogFactory.getLog((Class)OutStorageBillPlugin.class);
+    }
 }

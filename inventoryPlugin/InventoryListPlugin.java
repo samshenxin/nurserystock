@@ -1,4 +1,4 @@
-package jdy.zsf.nurserystock.outstoragePlugin;
+package jdy.zsf.nurserystock.inventoryPlugin;
 
 import kd.bos.list.plugin.*;
 import kd.bos.form.control.*;
@@ -8,18 +8,15 @@ import kd.bos.form.events.*;
 import kd.bos.orm.query.*;
 import kd.bos.servicehelper.*;
 import kd.bos.dataentity.entity.*;
-import java.math.*;
 import kd.bos.list.*;
 import kd.bos.bill.*;
 import kd.bos.form.*;
 import kd.bos.entity.datamodel.*;
 import java.util.*;
-import kd.bos.logging.*;
 
-public class OutStorageListPlugin extends AbstractListPlugin
+public class InventoryListPlugin extends AbstractListPlugin
 {
-    private static final Log log;
-    private static final String KEY_ORDERNAME = "zsf_ordername";
+    private static final String KEY_ORDERNAME = "zsf_name";
     
     public void registerListener(final EventObject e) {
         super.registerListener(e);
@@ -38,34 +35,32 @@ public class OutStorageListPlugin extends AbstractListPlugin
         final BillList billList = (BillList)args.getHyperLinkClickEvent().getSource();
         final ListSelectedRowCollection lsrc = billList.getCurrentListAllRowCollection();
         final QFilter[] filters = { (lsrc.get(selectRow) != null) ? new QFilter("id", "=", (Object)lsrc.get(selectRow).toString()) : null };
-        final Map<Object, DynamicObject> map = (Map<Object, DynamicObject>)BusinessDataServiceHelper.loadFromCache("zsf_outstorageorder", "id,name,number,zsf_ordername,zsf_qty,zsf_site,billstatus", filters);
+        final Map<Object, DynamicObject> map = (Map<Object, DynamicObject>)BusinessDataServiceHelper.loadFromCache("zsf_inventory", "id,name,billno,billstatus,zsf_name,zsf_invstatus,zsf_checker", filters);
         String billstatus = "";
-        BigDecimal qty = null;
-        Long site = 0L;
+        Object checker = "";
         String ordername = "";
+        String invstatus = null;
         for (final Map.Entry entry : map.entrySet()) {
             final DynamicObject object = (DynamicObject) entry.getValue();
             billstatus = object.getString("billstatus");
-            qty = (BigDecimal)object.get("zsf_qty");
-            ordername = object.getString("zsf_ordername");
-            final DynamicObject zsf_site = (DynamicObject)object.get("zsf_site");
-            site = (Long)zsf_site.get("id");
+            ordername = object.getString("zsf_name");
+            invstatus = object.getString("zsf_invstatus");
+            checker = object.getString("zsf_checker");
         }
-        if (StringUtils.equals((CharSequence)"zsf_ordername", (CharSequence)args.getHyperLinkClickEvent().getFieldName())) {
+        if (StringUtils.equals((CharSequence)"zsf_name", (CharSequence)args.getHyperLinkClickEvent().getFieldName())) {
             args.setCancel(true);
             final ListShowParameter showParameter = new ListShowParameter();
             showParameter.setFormId("bos_list");
             showParameter.setStatus(OperationStatus.ADDNEW);
-            showParameter.setCustomParam("zsf_outsid", (Object)ordername);
-            showParameter.setCustomParam("qty", (Object)qty.toString());
-            showParameter.setCustomParam("site", (Object)site);
+            final Map<String, Object> mapParam = new HashMap<String, Object>();
+            mapParam.put("insidParam", ordername);
+            mapParam.put("statusParam", billstatus);
+            mapParam.put("checkerParam", checker);
+            mapParam.put("invstatusParam", invstatus);
+            showParameter.setCustomParams((Map)mapParam);
             showParameter.getOpenStyle().setShowType(ShowType.MainNewTabPage);
-            showParameter.setBillFormId("zsf_outstorageorderdetail");
+            showParameter.setBillFormId("zsf_inventory_detail");
             this.getView().showForm((FormShowParameter)showParameter);
         }
-    }
-    
-    static {
-        log = LogFactory.getLog((Class)OutStorageListPlugin.class);
     }
 }

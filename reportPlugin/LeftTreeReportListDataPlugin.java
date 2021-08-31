@@ -1,46 +1,27 @@
 package jdy.zsf.nurserystock.reportPlugin;
 
-import kd.bos.algo.DataSet;
-import kd.bos.algo.GroupbyDataSet;
-import kd.bos.dataentity.entity.DynamicObject;
-import kd.bos.entity.report.AbstractReportListDataPlugin;
-import kd.bos.entity.report.FilterInfo;
-import kd.bos.entity.report.FilterItemInfo;
-import kd.bos.entity.report.ReportQueryParam;
-import kd.bos.orm.query.QCP;
-import kd.bos.orm.query.QFilter;
-import kd.bos.servicehelper.QueryServiceHelper;
+import kd.bos.dataentity.entity.*;
+import kd.bos.orm.query.*;
+import kd.bos.servicehelper.*;
+import kd.bos.entity.report.*;
+import kd.bos.algo.*;
 
-public class LeftTreeReportListDataPlugin extends AbstractReportListDataPlugin {
-
-	@Override
-	public DataSet query(ReportQueryParam reportQueryParam, Object arg1) throws Throwable {
-		// 获取过滤条件
-		FilterInfo filterInfo = reportQueryParam.getFilter();
-		FilterItemInfo itemSite = filterInfo.getFilterItem("zsf_search_basedata_site");
-
-		Long siteId = null;
-		QFilter siteQFilter = null;
-
-		// 构造QFilter
-		if (itemSite.getValue() instanceof DynamicObject) {
-			DynamicObject dynSite = (DynamicObject) itemSite.getValue();
-			siteId = (Long) dynSite.get("id");
-			siteQFilter = new QFilter("zsf_site", QCP.equals, siteId);
-
-		}
-		
-		DataSet dataSet = QueryServiceHelper.queryDataSet(this.getClass().getName(), "zsf_instorageorder",
-				"id, zsf_site", siteQFilter == null ? null : siteQFilter.toArray(), null);
-		
-		//对结果dataSet进行按照用户名字分组处理
-		GroupbyDataSet groupby = dataSet.groupBy(new String[]{"zsf_site"});
-		//对分组结果计数并命名别名count
-		groupby = groupby.count("zsf_qty");
-		//调用finish得到最终结果集
-		 DataSet dataSet3 = groupby.finish();
-		
-		return dataSet3;
-	}
-
+public class LeftTreeReportListDataPlugin extends AbstractReportListDataPlugin
+{
+    public DataSet query(final ReportQueryParam reportQueryParam, final Object arg1) throws Throwable {
+        final FilterInfo filterInfo = reportQueryParam.getFilter();
+        final FilterItemInfo itemSite = filterInfo.getFilterItem("zsf_search_basedata_site");
+        Long siteId = null;
+        QFilter siteQFilter = null;
+        if (itemSite.getValue() instanceof DynamicObject) {
+            final DynamicObject dynSite = (DynamicObject)itemSite.getValue();
+            siteId = (Long)dynSite.get("id");
+            siteQFilter = new QFilter("zsf_site", "=", (Object)siteId);
+        }
+        final DataSet dataSet = QueryServiceHelper.queryDataSet(this.getClass().getName(), "zsf_instorageorder", "id, zsf_site", (QFilter[])((siteQFilter == null) ? null : siteQFilter.toArray()), (String)null);
+        GroupbyDataSet groupby = dataSet.groupBy(new String[] { "zsf_site" });
+        groupby = groupby.count("zsf_qty");
+        final DataSet dataSet2 = groupby.finish();
+        return dataSet2;
+    }
 }

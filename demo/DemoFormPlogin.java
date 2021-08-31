@@ -18,5 +18,6 @@ public class DemoFormPlogin extends AbstractFormPlugin {
     Control control = (Control) evt.getSource();
     String key = control.getKey();
     this.getView().showMessage("点击事件");
+    System.out.print("");
   }
 }

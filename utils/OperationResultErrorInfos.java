@@ -1,41 +1,29 @@
 package jdy.zsf.nurserystock.utils;
 
+import kd.bos.entity.operate.result.*;
+import java.util.*;
 
-import java.util.List;
-
-import kd.bos.entity.operate.result.IOperateInfo;
-import kd.bos.entity.operate.result.OperateErrorInfo;
-import kd.bos.entity.operate.result.OperationResult;
-
-public class OperationResultErrorInfos {
-	/**
-	 *  * 获取操作错误信息  * @param operationResult  * @return  
-	 */
-	@SuppressWarnings("unused")
-	private String getOperationResultErrorInfos(OperationResult operationResult){
-	    if(operationResult.isSuccess()){
-//	         return StringUtils.EMPTY;
-	    	return "";
-	  }
-
-	    List<IOperateInfo> errorInfos = operationResult.getAllErrorOrValidateInfo();
-	    int size = errorInfos.size() + operationResult.getSuccessPkIds().size();
-	    if (size > 1) {
-	        StringBuilder stringBuilder = new StringBuilder();
-	        int i = 0;
-	        for(int len = errorInfos.size(); i < 5 && i < len; ++i) {
-	         stringBuilder.append((errorInfos.get(i)).getMessage());
-	        }
-	        return stringBuilder.toString();
-	    } else if (!errorInfos.isEmpty()) {
-	        OperateErrorInfo errorInfo = (OperateErrorInfo)errorInfos.get(0);
-            String msg = errorInfo.getMessage() == null ? "" : errorInfo.getMessage();
+public class OperationResultErrorInfos
+{
+    private String getOperationResultErrorInfos(final OperationResult operationResult) {
+        if (operationResult.isSuccess()) {
+            return "";
+        }
+        final List<IOperateInfo> errorInfos = (List<IOperateInfo>)operationResult.getAllErrorOrValidateInfo();
+        final int size = errorInfos.size() + operationResult.getSuccessPkIds().size();
+        if (size > 1) {
+            final StringBuilder stringBuilder = new StringBuilder();
+            for (int i = 0, len = errorInfos.size(); i < 5 && i < len; ++i) {
+                stringBuilder.append(errorInfos.get(i).getMessage());
+            }
+            return stringBuilder.toString();
+        }
+        if (!errorInfos.isEmpty()) {
+            final OperateErrorInfo errorInfo = (OperateErrorInfo)errorInfos.get(0);
+            final String msg = (errorInfo.getMessage() == null) ? "" : errorInfo.getMessage();
             return msg;
-	   } else {
-		   String msg = operationResult.getMessage() == null ? "" : operationResult.getMessage();
-		   return msg;
-	   }
-	}
-
+        }
+        final String msg2 = (operationResult.getMessage() == null) ? "" : operationResult.getMessage();
+        return msg2;
+    }
 }
-
